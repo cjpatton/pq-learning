@@ -38,6 +38,32 @@
 # NOTE The scheme is only selectively secure, which is weaker than what we
 # would hope to achieve for an encryption scheme. We need to figure out if
 # achieving full security (https://eprint.iacr.org/2019/365) is realistic.
+#
+# To implement this policy as an inner-product predicate, for each sequence of
+# attributes, we derive a corresponding sequence of "tag" matrices such that,
+# if and only if the policy is valid, the inner product of the sequence of
+# matrices is zero.
+#
+# Each encryption attribute is hashed to an invertible tag matrix, unless the
+# attribute is None, in which case we set the tag matrix to zero. Each
+# decryption attribute (none of which is None) is set to the hash of the tag
+# matrix for that attribute. In the inner product of encryption and decryption
+# matrices, the multiplication of matching tags will result in the identity
+# matrix, and multiplication by None will result in the zero matrix. For
+# example, if the encryption attributes are ["EU", None, "cool"] and the
+# decryption attributes are ["EU", "prod", "cool"], then the inner product of
+# the tag matrices is
+#
+#   (T0 * T0^-1) + (0 * T1^-1) + (T2 * T2^-1) = 2 * I
+#
+# where T0 is the tag matrix for "EU", T1 is the tag matrix for "prod", and so
+# on, 0 is the all zero matrix, and I is the identity matrix.
+#
+# This policy is valid, so we want the inner product to be 0 rather than c * I
+# where is the number of encryption attributes that are set (i.e., not None).
+# To do this, we append one more matrix to the enc of each sequence. The
+# encryptor sets this to -c * I and the decrypter sets it to I. This way the
+# inner product will be 0.
 
 from random import Random, randbytes
 from sage.all import GF, ceil, log, matrix
@@ -141,7 +167,6 @@ def trapdoor(T):
     Generates an (almost) uniform matrix M with a secret trapdoor R, as
     specified in 2015/939, Section 5.4.3. The tag matrix T must be invertible.
     '''
-    assert T.nrows() == T.ncols()
     q = len(T.base_ring())  # assumes the base ring is GF(q)
     n = T.nrows()
     F = GF(q)
@@ -179,8 +204,8 @@ def tag(n, q, i, attribute):
     if attribute == None:
         return zero_mat(n, n, q)
 
-    # For security purposes, we would want to apply a collision resistant hash
-    # function here.
+    # NOTE For security purposes, we would want to apply a collision resistant
+    # hash function here.
     rand = Random(bytes(i) + attribute)
     H = uniform_mat_from_rand(rand, n, n, q)
     while not H.is_invertible():
@@ -188,6 +213,11 @@ def tag(n, q, i, attribute):
     return H
 
 def enc_attr_to_tags(n, q, attrs):
+    '''
+    Derive the tag matrices for a sequence of encryption attributes. If the
+    inner product of these matrices with the decryption tags is zero, then
+    decryption will succeed. Otherwise, decryption will fail.
+    '''
     assert 0 <= len(attrs) < 255  # 255 is reserved for trapdoor tag
     F = GF(q)
 
@@ -202,6 +232,11 @@ def enc_attr_to_tags(n, q, attrs):
     return H
 
 def dec_attr_to_tags(n, q, attrs):
+    '''
+    Derive the tag matrices for a sequence of decryption attributes. If the
+    inner product of these matrices with the encryption tags is zero, then
+    decryption will succeed. Otherwise, decryption will fail.
+    '''
     assert 0 <= len(attrs) < 255  # 255 is reserved for trapdoor tag
 
     P = []
@@ -212,6 +247,10 @@ def dec_attr_to_tags(n, q, attrs):
     return P
 
 def setup(n, q, num_attrs):
+    '''
+    Generate the master public key and master secret key for the given number
+    of attributes.
+    '''
     G = gadget_mat(n, q)
     T = tag(n, q, 255, b'trapdoor tag')
 
@@ -221,6 +260,9 @@ def setup(n, q, num_attrs):
     return ((A, M, u), R)
 
 def key_gen(mpk, msk, attrs):
+    '''
+    Generate a decryption key for the given attributes.
+    '''
     (A, M, u) = mpk
     R = msk
 
@@ -248,6 +290,9 @@ def key_gen(mpk, msk, attrs):
     return (S_dec, x)
 
 def encrypt(mpk, attrs, plaintext):
+    '''
+    Encrypt the given plaintext towards the given attributes.
+    '''
     assert 0 <= plaintext < 2
     (A, M, u) = mpk
 
@@ -271,6 +316,11 @@ def encrypt(mpk, attrs, plaintext):
     return ciphertext
 
 def decrypt(sk, ciphertext):
+    '''
+    Decrypt the given ciphertext. If the encryption attributes don't match the
+    attributes associated with the decryption key, then the result will be
+    incorrect.
+    '''
     (S_dec, x) = sk
     (c0, c1, c2) = ciphertext
     q = len(c0.base_ring())  # assumes the base ring is GF(q)
