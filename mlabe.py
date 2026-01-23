@@ -1,5 +1,5 @@
 # Implementation of the ABE scheme from https://eprint.iacr.org/2015/939,
-# Section 6.2.1 using module LWE instead of plain MLE.
+# Section 6.2.1 using module LWE instead of plain LWE.
 
 from random import Random, randbytes, randint
 from sage.all import GF, PolynomialRing, ceil, log, matrix
@@ -9,6 +9,7 @@ D = 256
 K = ceil(log(Q) / log(2))
 F = GF(Q)
 R = PolynomialRing(F, 'x').quotient(f'x^{D} + 1')
+B = 57
 
 def zero_mat(N, M):
     '''
@@ -28,7 +29,7 @@ def identity_mat(N):
 
 def uniform_mat_from_rand(rand, N, M):
     '''
-    Returns a random n by m matrix over R using the provided source of
+    Returns a random N by M matrix over R using the provided source of
     randomness.
     '''
     rows = []
@@ -44,11 +45,11 @@ def uniform_mat_from_rand(rand, N, M):
 
 def rand_uniform_mat(N, M):
     '''
-    Returns a random n by m matrix over R.
+    Returns a random N by M matrix over R.
     '''
     return uniform_mat_from_rand(Random(randbytes(32)), N, M)
 
-def rand_short_mat(N, M, B):
+def rand_short_mat(N, M):
     '''
     Returns a random N by M matrix over R with coefficients in range [-B, B).
     '''
@@ -67,7 +68,7 @@ def gadget_inv(U):
     '''
     Find a pre-image X such that G*X = U, where G is the gadget matrix.
     '''
-    out = [[R(0)] * U.ncols() for _ in range(U.nrows() * K)]
+    out = matrix([[R(0)] * U.ncols() for _ in range(U.nrows() * K)])
 
     for i in range(U.nrows()):
         for j in range(U.ncols()):
@@ -78,28 +79,28 @@ def gadget_inv(U):
                     u_bits[k].append(F((int(u_coef[d]) >> k) & 1))
 
             for k in range(K):
-                out[i*K + k][j] =  R(u_bits[k])
+                out[i*K + k, j] =  R(u_bits[k])
 
-    return matrix(out)
+    return out
 
 def gadget(X):
     '''
     Return G*X where G is the gadget matrix.
     '''
     assert X.nrows() % K == 0
-    out = [[R(0)] * X.ncols() for _ in range(X.nrows() // K)]
+    out = matrix([[R(0)] * X.ncols() for _ in range(X.nrows() // K)])
 
     for i in range(X.nrows() // K):
         for j in range(X.ncols()):
             u_coef = []
-            x_coef = [ X[i*K + k,j].list() for k in range(K) ]
+            x_coef = [ X[i*K + k, j].list() for k in range(K) ]
             for d in range(D):
                 u_coef.append(0)
                 for k in range(K):
                     u_coef[d] |= int(x_coef[k][d]) << k
-            out[i][j] = R(u_coef)
+            out[i, j] = R(u_coef)
 
-    return matrix(out)
+    return out
 
 def trapdoor(T, B):
     '''
@@ -110,20 +111,20 @@ def trapdoor(T, B):
     G = gadget(identity_mat(N*K))
 
     A0 = identity_mat(N).augment(rand_uniform_mat(N, N))
-    R0 = rand_short_mat(2*N, K*N, B)
+    R0 = rand_short_mat(2*N, K*N)
     A = A0.augment(T*G - A0*R0)
     R = R0.stack(identity_mat(N*K))
     return (A, R)
 
 def sample_trapdoor(T, A, R, u):
     '''
-    Sample a solution x to T*x = u using the G-trapdoor R for tag T.
+    Sample a solution x to A*x = u using the G-trapdoor R for tag T.
     '''
     N = A.nrows()
     M = A.ncols()
 
     # TODO Figure out how securely sample p.
-    p = rand_short_mat(M, 1, 13)
+    p = rand_short_mat(M, 1)
     x = p + R * gadget_inv(T.inverse() * (u - A*p))
     return x
 
@@ -156,8 +157,6 @@ def enc_attr_to_tags(N, attrs):
             count += 1
     for (i, attr) in enumerate(attrs):
         H.append(tag(N, i, attr))
-    # TODO I think we should be able to avoid tacking on an extra correction
-    # tag.
     H.append(R(-count) * identity_mat(N))
     return H
 
@@ -181,7 +180,7 @@ def setup(N, num_attrs):
     '''
     G = gadget(identity_mat(N*K))
     T = identity_mat(N)
-    (A0, R) = trapdoor(T, 13)
+    (A0, R) = trapdoor(T, B)
     u = rand_uniform_mat(N, 1)
     A = rand_uniform_mat(N, G.ncols() * (num_attrs+1))
     return ((A, A0, u), R)
@@ -202,7 +201,7 @@ def key_gen(mpk, msk, attrs):
         S_dec = S_dec.stack(gadget_inv(P[i]*G))
     B_dec = A * S_dec
 
-    y = rand_short_mat(B_dec.ncols(), 1, 13)
+    y = rand_short_mat(B_dec.ncols(), 1)
     x = sample_trapdoor(T, A0, R, u - B_dec*y).stack(y)
     assert A0.augment(B_dec) * x == u
     return (S_dec, x)
@@ -228,7 +227,7 @@ def encrypt(mpk, attrs, plaintext):
         S_enc = S_enc.augment(H[i]*G)
     B_enc = A + S_enc
 
-    s = rand_short_mat(1, N, 13)
+    s = rand_short_mat(1, N)
     ciphertext = (
         s * A0,
         s * B_enc,

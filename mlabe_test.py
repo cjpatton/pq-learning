@@ -1,4 +1,5 @@
 from mlabe import *
+from random import randbytes
 from unittest import TestCase
 
 class TestMlAbe(TestCase):
@@ -90,7 +91,7 @@ class TestMlAbe(TestCase):
         N = 2
         num_attrs = 2
         (mpk, msk) = setup(N, num_attrs)
-        plaintext = b"0123456789abcdef0123456789abcdef"
+        plaintext = randbytes(32)
 
         test_cases = [
             {
