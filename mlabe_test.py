@@ -97,22 +97,32 @@ class TestMlAbe(TestCase):
             {
                 'enc_attributes': [b'EU', b'prod'],
                 'dec_attributes': [b'EU', b'prod'],
+                'expect_success': True,
             },
             {
                 'enc_attributes': [b'EU', b'prod'],
                 'dec_attributes': [b'EU', b'prod'],
+                'expect_success': True,
             },
             {
                 'enc_attributes': [None, b'prod'],
                 'dec_attributes': [b'EU', b'prod'],
+                'expect_success': True,
             },
             {
                 'enc_attributes': [b'EU', None],
                 'dec_attributes': [b'EU', b'prod'],
+                'expect_success': True,
             },
             {
                 'enc_attributes': [None, None],
                 'dec_attributes': [b'EU', b'prod'],
+                'expect_success': True,
+            },
+            {
+                'enc_attributes': [b'Margaritaville', b'prod'],
+                'dec_attributes': [b'EU', b'prod'],
+                'expect_success': False,
             },
         ]
 
@@ -121,5 +131,4 @@ class TestMlAbe(TestCase):
             assert len(t['enc_attributes']) == num_attrs
             sk = key_gen(mpk, msk, t['dec_attributes'])
             ciphertext = encrypt(mpk, t['enc_attributes'], plaintext)
-            plaintext = decrypt(sk, ciphertext)
-            self.assertEqual(plaintext, plaintext)
+            self.assertEqual(plaintext == decrypt(sk, ciphertext), t['expect_success'])
