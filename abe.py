@@ -68,6 +68,8 @@
 from random import Random, randbytes
 from sage.all import GF, ceil, log, matrix
 
+B = 2
+
 def uniform_mat_from_rand(rand, n, m, q):
     '''
     Returns a random n by m matrix over GF(q) using the provided source of
@@ -173,7 +175,7 @@ def trapdoor(T):
     l = ceil(log(q) / log(2))
 
     A0 = identity_mat(n, q).augment(rand_uniform_mat(n, n, q))
-    R0 = rand_short_mat(2*n, n*l, q, 13)
+    R0 = rand_short_mat(2*n, n*l, q, B)
 
     M = A0.augment(T * gadget_mat(n, q) - A0 * R0)
     R = R0.stack(identity_mat(n*l, q))
@@ -190,7 +192,7 @@ def sample_trapdoor(T, M, R, u):
     n = M.nrows()
     m = M.ncols()
 
-    p = rand_short_mat(m, 1, q, 13)
+    p = rand_short_mat(m, 1, q, B)
     x = p + R * gadget_inv(T.inverse() * (u - M*p))
     return x
 
@@ -284,7 +286,7 @@ def key_gen(mpk, msk, attrs):
         S_dec = S_dec.stack(gadget_inv(P[i]*G))
     B_dec = A * S_dec
 
-    y = rand_short_mat(B_dec.ncols(), 1, q, 13)
+    y = rand_short_mat(B_dec.ncols(), 1, q, B)
     x = sample_trapdoor(T, M, R, u - B_dec*y).stack(y)
     assert M.augment(B_dec) * x == u
     return (S_dec, x)
@@ -307,12 +309,14 @@ def encrypt(mpk, attrs, plaintext):
         S_enc = S_enc.augment(H[i]*G)
     B_enc = A + S_enc
 
-    s = rand_short_mat(1, n, q, 13)
-    ciphertext = (
+    s = rand_short_mat(1, n, q, B)
+    ciphertext = [
         s * M,
         s * B_enc,
         s * u + F(plaintext * (q // 2)),
-    )
+    ]
+    for (i, c) in enumerate(ciphertext):
+        ciphertext[i] += rand_short_mat(c.nrows(), c.ncols(), q, B)
     return ciphertext
 
 def decrypt(sk, ciphertext):
@@ -322,8 +326,10 @@ def decrypt(sk, ciphertext):
     incorrect.
     '''
     (S_dec, x) = sk
-    (c0, c1, c2) = ciphertext
+    [c0, c1, c2] = ciphertext
     q = len(c0.base_ring())  # assumes the base ring is GF(q)
 
     p = c0.augment(c1 * S_dec) * x - c2
-    return int(p[0,0]) // (q // 2)
+    if q//4 <= int(p[0,0]) < 3*q//4:
+        return 1
+    return 0

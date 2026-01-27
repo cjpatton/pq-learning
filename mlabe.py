@@ -4,12 +4,14 @@
 from random import Random, randbytes, randint
 from sage.all import GF, PolynomialRing, ceil, log, matrix
 
-Q = 3329
+# TODO Figure out how to tune the noise properly so that we don't need such a
+# big field.
+Q = 4293918721
+B = 4
 D = 256
 K = ceil(log(Q) / log(2))
 F = GF(Q)
 R = PolynomialRing(F, 'x').quotient(f'x^{D} + 1')
-B = 57
 
 def zero_mat(N, M):
     '''
@@ -59,7 +61,7 @@ def rand_short_mat(N, M):
         for j in range(M):
             poly = []
             for d in range(D):
-                poly.append(F(randint(-B, B)))
+                poly.append(F(randint(-B, B+1)))
             row.append(R(poly))
         rows.append(row)
     return matrix(rows)
@@ -109,17 +111,17 @@ def trapdoor(T):
     assert T.nrows() == T.ncols()
     N = T.nrows()
     G = gadget(identity_mat(N*K))
-    W = 2  # TODO Figure out how to set this
 
-    A0 = rand_uniform_mat(N, W*N)
-    R0 = rand_short_mat(W*N, K*N)
+    A0 = identity_mat(N).augment(rand_uniform_mat(N, N))
+    R0 = rand_short_mat(2*N, K*N)
     A = A0.augment(T*G - A0*R0)
     R = R0.stack(identity_mat(N*K))
     return (A, R)
 
 def sample_trapdoor(T, A, R, u):
     '''
-    Sample a solution x to A*x = u using the G-trapdoor R for tag T.
+    Sample a solution x to A*x = u using the G-trapdoor R for tag T as in
+    2015/939, Section 5.4.3.
     '''
     N = A.nrows()
     M = A.ncols()
@@ -220,20 +222,23 @@ def encrypt(mpk, attrs, plaintext):
 
     p_coef = []
     for l in range(D):
-        p_coef.append((plaintext[l // 8] >> (l % 8)) & 1)
-    p = (Q // 2) * R(p_coef)
+        bit = (plaintext[l // 8] >> (l % 8)) & 1
+        p_coef.append(F(bit * (Q//2)))
+    p = R(p_coef)
 
     S_enc = H[0]*G
     for i in range(1, len(H)):
         S_enc = S_enc.augment(H[i]*G)
     B_enc = X + S_enc
 
-    s = rand_short_mat(1, N)
-    ciphertext = (
+    s = rand_short_mat(1, N)  # XXX unifvorm?
+    ciphertext = [
         s * A,
         s * B_enc,
         s * u + p,
-    )
+    ]
+    for (i, c) in enumerate(ciphertext):
+        ciphertext[i] += rand_short_mat(c.nrows(), c.ncols())
     return ciphertext
 
 def decrypt(sk, ciphertext):
@@ -244,12 +249,15 @@ def decrypt(sk, ciphertext):
     '''
     assert D % 8 == 0
     (S_dec, x) = sk
-    (c0, c1, c2) = ciphertext
+    [c0, c1, c2] = ciphertext
 
     p = c0.augment(c1 * S_dec) * x - c2
     p_coef = p[0,0].list()
     p_bytes = [0] * (D // 8)
     for l in range(D):
-        bit = int(p_coef[l]) // (Q // 2)
+        if Q//4 <= int(p_coef[l]) < 3*Q//4:
+            bit = 1
+        else:
+            bit = 0
         p_bytes[l // 8] |= bit << (l % 8)
     return bytes(p_bytes)

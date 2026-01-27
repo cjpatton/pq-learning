@@ -130,8 +130,8 @@ class TestAbe(TestCase):
             },
         ]
 
-        for t in test_cases:
+        for (i, t) in enumerate(test_cases):
             sk = key_gen(mpk, msk, t['dec_attributes'])
             ciphertext = encrypt(mpk, t['enc_attributes'], t['plaintext'])
             plaintext = decrypt(sk, ciphertext)
-            self.assertEqual(plaintext, t['plaintext'])
+            self.assertEqual(plaintext, t['plaintext'], f'test case {i}')

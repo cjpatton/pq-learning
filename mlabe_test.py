@@ -89,11 +89,14 @@ class TestMlAbe(TestCase):
 
     def test_roundtrip(self):
         N = 2
-        num_attrs = 2
-        (mpk, msk) = setup(N, num_attrs)
-        plaintext = randbytes(32)
+        plaintext = randbytes(D // 8)
 
         test_cases = [
+            {
+                'enc_attributes': [],
+                'dec_attributes': [],
+                'expect_success': True,
+            },
             {
                 'enc_attributes': [b'EU', b'prod'],
                 'dec_attributes': [b'EU', b'prod'],
@@ -126,9 +129,10 @@ class TestMlAbe(TestCase):
             },
         ]
 
-        for t in test_cases:
+        for (i, t) in enumerate(test_cases):
             assert len(t['enc_attributes']) == len(t['dec_attributes'])
-            assert len(t['enc_attributes']) == num_attrs
+            num_attrs = len(t['enc_attributes'])
+            (mpk, msk) = setup(N, num_attrs)
             sk = key_gen(mpk, msk, t['dec_attributes'])
             ciphertext = encrypt(mpk, t['enc_attributes'], plaintext)
-            self.assertEqual(plaintext == decrypt(sk, ciphertext), t['expect_success'])
+            self.assertEqual(plaintext == decrypt(sk, ciphertext), t['expect_success'], f'test case {i}')
