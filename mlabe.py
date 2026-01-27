@@ -102,16 +102,17 @@ def gadget(X):
 
     return out
 
-def trapdoor(T, B):
+def trapdoor(T):
     '''
     Return a(n almost) random matrix A with G-trapdoor R for tag T.
     '''
     assert T.nrows() == T.ncols()
     N = T.nrows()
     G = gadget(identity_mat(N*K))
+    W = 2  # TODO Figure out how to set this
 
-    A0 = identity_mat(N).augment(rand_uniform_mat(N, N))
-    R0 = rand_short_mat(2*N, K*N)
+    A0 = rand_uniform_mat(N, W*N)
+    R0 = rand_short_mat(W*N, K*N)
     A = A0.augment(T*G - A0*R0)
     R = R0.stack(identity_mat(N*K))
     return (A, R)
@@ -180,18 +181,18 @@ def setup(N, num_attrs):
     '''
     G = gadget(identity_mat(N*K))
     T = identity_mat(N)
-    (A0, R) = trapdoor(T, B)
+    (A, R) = trapdoor(T)
     u = rand_uniform_mat(N, 1)
-    A = rand_uniform_mat(N, G.ncols() * (num_attrs+1))
-    return ((A, A0, u), R)
+    X = rand_uniform_mat(N, G.ncols() * (num_attrs+1))
+    return ((X, A, u), R)
 
 def key_gen(mpk, msk, attrs):
     '''
     Generate a decryption key for the given attributes.
     '''
-    (A, A0, u) = mpk
+    (X, A, u) = mpk
     R = msk
-    N = A0.nrows()
+    N = A.nrows()
     G = gadget(identity_mat(N*K))
     T = identity_mat(N)
     P = dec_attr_to_tags(N, attrs)
@@ -199,11 +200,11 @@ def key_gen(mpk, msk, attrs):
     S_dec = gadget_inv(P[0]*G)
     for i in range(1, len(P)):
         S_dec = S_dec.stack(gadget_inv(P[i]*G))
-    B_dec = A * S_dec
+    B_dec = X * S_dec
 
     y = rand_short_mat(B_dec.ncols(), 1)
-    x = sample_trapdoor(T, A0, R, u - B_dec*y).stack(y)
-    assert A0.augment(B_dec) * x == u
+    x = sample_trapdoor(T, A, R, u - B_dec*y).stack(y)
+    assert A.augment(B_dec) * x == u
     return (S_dec, x)
 
 def encrypt(mpk, attrs, plaintext):
@@ -212,8 +213,8 @@ def encrypt(mpk, attrs, plaintext):
     '''
     assert len(plaintext) == 32
     assert D == 256
-    (A, A0, u) = mpk
-    N = A0.nrows()
+    (X, A, u) = mpk
+    N = A.nrows()
     G = gadget(identity_mat(N*K))
     H = enc_attr_to_tags(N, attrs)
 
@@ -225,11 +226,11 @@ def encrypt(mpk, attrs, plaintext):
     S_enc = H[0]*G
     for i in range(1, len(H)):
         S_enc = S_enc.augment(H[i]*G)
-    B_enc = A + S_enc
+    B_enc = X + S_enc
 
     s = rand_short_mat(1, N)
     ciphertext = (
-        s * A0,
+        s * A,
         s * B_enc,
         s * u + p,
     )

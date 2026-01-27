@@ -24,7 +24,7 @@ class TestMlAbe(TestCase):
     def test_trapdoor(self):
         N = 2
         H = identity_mat(N)
-        (A, R) = trapdoor(H, 13)
+        (A, R) = trapdoor(H)
 
         u = rand_uniform_mat(N, 1)
         w = gadget_inv(H.inverse() * u)
