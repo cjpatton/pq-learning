@@ -39,7 +39,7 @@ def uniform_mat_from_rand(rand, N, M):
         for m in range(M):
             poly = []
             for d in range(D):
-                poly.append(F(rand.randint(0, Q)))
+                poly.append(F(rand.randint(0, Q-1)))
             row.append(R(poly))
         rows.append(row)
     return matrix(rows)
@@ -64,6 +64,22 @@ def rand_short_mat(N, M):
             row.append(R(poly))
         rows.append(row)
     return matrix(rows)
+
+def rand_bleep_mat(N, M):
+    '''
+    XXX
+    '''
+    rows = []
+    for i in range(N):
+        row = []
+        for j in range(M):
+            poly = []
+            for d in range(D):
+                poly.append(F(2*randint(0,1) - 1))
+            row.append(R(poly))
+        rows.append(row)
+    return matrix(rows)
+
 
 def gadget_inv(U):
     '''
@@ -230,14 +246,12 @@ def encrypt(mpk, attrs, plaintext):
         S_enc = S_enc.augment(H[i]*G)
     B_enc = X + S_enc
 
-    s = rand_short_mat(1, N)  # XXX unifvorm?
+    s = rand_uniform_mat(1, N)
     ciphertext = [
-        s * A,
-        s * B_enc,
-        s * u + p,
+        s * A     + rand_short_mat(1, A.ncols()),
+        s * B_enc + rand_short_mat(1, B_enc.ncols()),
+        s * u + p + rand_short_mat(1, 1),
     ]
-    for (i, c) in enumerate(ciphertext):
-        ciphertext[i] += rand_short_mat(c.nrows(), c.ncols())
     return ciphertext
 
 def decrypt(sk, ciphertext):
