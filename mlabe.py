@@ -211,8 +211,8 @@ def encrypt(mpk, attrs, plaintext):
     '''
     Encrypt the given plaintext towards the given attributes.
     '''
-    assert len(plaintext) == 32
-    assert D == 256
+    assert D % 8 == 0
+    assert len(plaintext) == D // 8
     (X, A, u) = mpk
     N = A.nrows()
     G = gadget(identity_mat(N*K))
@@ -242,13 +242,13 @@ def decrypt(sk, ciphertext):
     attributes associated with the decryption key, then the result will be
     incorrect.
     '''
-    assert D == 256
+    assert D % 8 == 0
     (S_dec, x) = sk
     (c0, c1, c2) = ciphertext
 
     p = c0.augment(c1 * S_dec) * x - c2
     p_coef = p[0,0].list()
-    p_bytes = [0] * 32
+    p_bytes = [0] * (D // 8)
     for l in range(D):
         bit = int(p_coef[l]) // (Q // 2)
         p_bytes[l // 8] |= bit << (l % 8)
