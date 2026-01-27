@@ -2,12 +2,11 @@
 # Section 6.2.1 using module LWE instead of plain LWE.
 
 from random import Random, randbytes, randint
-from sage.all import GF, PolynomialRing, ceil, log, matrix
+from sage.all import GF, Integer, PolynomialRing, ceil, log, matrix
+from sage.stats.distributions.discrete_gaussian_integer import DiscreteGaussianDistributionIntegerSampler
 
-# TODO Figure out how to tune the noise properly so that we don't need such a
-# big field.
-Q = 4293918721
-B = 4
+Dist = DiscreteGaussianDistributionIntegerSampler(sigma=1)
+Q = Integer(2**18).next_prime()
 D = 256
 K = ceil(log(Q) / log(2))
 F = GF(Q)
@@ -61,7 +60,7 @@ def rand_short_mat(N, M):
         for j in range(M):
             poly = []
             for d in range(D):
-                poly.append(F(randint(-B, B+1)))
+                poly.append(F(Dist()))
             row.append(R(poly))
         rows.append(row)
     return matrix(rows)

@@ -72,4 +72,4 @@ def plot_ciphertext_dist():
 
 if __name__ == '__main__':
     sizes()
-    plot_ciphertext_dist()
+    #plot_ciphertext_dist()
