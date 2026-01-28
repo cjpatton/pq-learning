@@ -5,12 +5,12 @@ from random import Random, randbytes, randint
 from sage.all import GF, Integer, PolynomialRing, ceil, log, matrix
 from sage.stats.distributions.discrete_gaussian_integer import DiscreteGaussianDistributionIntegerSampler
 
-Dist = DiscreteGaussianDistributionIntegerSampler(sigma=14)
 Q = 8380417
 D = 256
 K = ceil(log(Q) / log(2))
 F = GF(Q)
 R = PolynomialRing(F, 'x').quotient(f'x^{D} + 1')
+Dist = DiscreteGaussianDistributionIntegerSampler(sigma=14)
 
 def zero_mat(N, M):
     '''
@@ -105,12 +105,14 @@ def gadget(X):
 
 def trapdoor(T):
     '''
-    Return a(n almost) random matrix A with G-trapdoor R for tag T.
+    Return a(n almost) uniform random matrix A with G-trapdoor R for tag T.
     '''
     assert T.nrows() == T.ncols()
     N = T.nrows()
     G = gadget(identity_mat(N*K))
 
+    # TODO Make sure this is correct. We're aiming for the computational
+    # instantiation described in 2011/501, Section 5.2.
     A0 = identity_mat(N).augment(rand_uniform_mat(N, N))
     R0 = rand_short_mat(2*N, K*N)
     A = A0.augment(T*G - A0*R0)
@@ -132,21 +134,23 @@ def sample_trapdoor(T, A, R, u):
 
 def attr_to_ext(N, i, attr):
     '''
-    XXX
+    Derive an element of GF(Q^N) from the given index and attribute.
     '''
     F_ext = GF(Q**N)
 
-    # TODO We should salt this using a seed store in the public parameters.
+    # TODO Use a XOF here for collision resistance. Also, Q^N needs to be large
+    # enough.
     #
-    # TODO Use a XOF here to ensure tag matrix derivation is collision
-    # resistant (e.g., SHAKE128). Also, Q^N needs to e large enough.
+    # NOTE Ultimately I think collisions are too close for comfort. It probably
+    # makes more sense to have a registry that maps attributes to points in
+    # GF(Q^N).
     rand = Random(bytes(i) + attr)
     h = F_ext([ rand.randint(0, Q-1) for _ in range(N) ])
     return h
 
 def tag(N, i, attr):
     '''
-    Derive an invertible tag matrix from the given index (i) and attribute.
+    Derive a tag matrix from the given index (i) and attribute.
     '''
     F_ext = GF(Q**N)
 

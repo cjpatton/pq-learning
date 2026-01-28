@@ -18,9 +18,9 @@ def sizes():
         ciphertext = encrypt(mpk, [b'x'] * num_attrs, plaintext)
         assert plaintext == decrypt(sk, ciphertext)
 
-        # Master public key size. A, u can be expanded from a seed, as can part of A0.
-        (_A, A0, _u) = mpk
-        poly_ct = A0.nrows() * (A0.ncols() - 2 * N)
+        # Master public key size. X, u can be expanded from a seed.
+        (_X, A, _u) = mpk
+        poly_ct = A.nrows() * A.ncols()
         seed_bytes = 32 * 2  # one for A, u and another for part of A0
         print('Public key size:', poly_bytes(poly_ct) + seed_bytes)
 
