@@ -4,7 +4,7 @@ from random import randbytes
 import matplotlib.pyplot as plt
 
 def sizes():
-    N = 3
+    N = 2
 
     def poly_bytes(ct):
         return (ct * D * K) / 8

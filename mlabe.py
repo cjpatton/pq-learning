@@ -5,7 +5,7 @@ from random import Random, randbytes, randint
 from sage.all import GF, Integer, PolynomialRing, ceil, log, matrix
 from sage.stats.distributions.discrete_gaussian_integer import DiscreteGaussianDistributionIntegerSampler
 
-Dist = DiscreteGaussianDistributionIntegerSampler(sigma=10)
+Dist = DiscreteGaussianDistributionIntegerSampler(sigma=15)
 Q = 8380417
 D = 256
 K = ceil(log(Q) / log(2))
