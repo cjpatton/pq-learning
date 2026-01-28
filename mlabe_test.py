@@ -1,5 +1,5 @@
 from mlabe import *
-from random import randbytes
+from random import randbytes, randint
 from unittest import TestCase
 
 class TestMlAbe(TestCase):
@@ -20,6 +20,19 @@ class TestMlAbe(TestCase):
         X = rand_uniform_mat(4, 4)
         self.assertEqual(X*identity_mat(4), X)
         self.assertEqual(identity_mat(4)*X, X)
+
+    def test_tag(self):
+        N = 3
+        inp = (1, b'hello')
+        H = tag(N, *inp)
+        h = attr_to_ext(N, *inp)
+        x = [ randint(0, Q-1) for _ in range(N) ]
+
+        # The tag matrix should multiply by the tag. See 2015/939, Section
+        # 5.4.3 ("Puncturing").
+        want = h * GF(Q**N)(x)
+        got = H * matrix([ [R(y)] for y in x ])
+        self.assertEqual(got.T[0].list(), want.list())
 
     def test_trapdoor(self):
         N = 2
@@ -57,7 +70,7 @@ class TestMlAbe(TestCase):
                 'dec_attributes': [b'EU', b'prod'],
                 'expect_valid': True,
             },
-        {
+            {
                 'enc_attributes': [None, None],
                 'dec_attributes': [b'EU', b'prod'],
                 'expect_valid': True,

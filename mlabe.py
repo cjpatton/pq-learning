@@ -5,8 +5,8 @@ from random import Random, randbytes, randint
 from sage.all import GF, Integer, PolynomialRing, ceil, log, matrix
 from sage.stats.distributions.discrete_gaussian_integer import DiscreteGaussianDistributionIntegerSampler
 
-Dist = DiscreteGaussianDistributionIntegerSampler(sigma=1)
-Q = Integer(2**18).next_prime()
+Dist = DiscreteGaussianDistributionIntegerSampler(sigma=10)
+Q = 8380417
 D = 256
 K = ceil(log(Q) / log(2))
 F = GF(Q)
@@ -28,10 +28,9 @@ def identity_mat(N):
         out[i,i] = R(1)
     return matrix(out)
 
-def uniform_mat_from_rand(rand, N, M):
+def rand_uniform_mat(N, M):
     '''
-    Returns a random N by M matrix over R using the provided source of
-    randomness.
+    Returns a random N by M matrix over R.
     '''
     rows = []
     for n in range(N):
@@ -39,15 +38,11 @@ def uniform_mat_from_rand(rand, N, M):
         for m in range(M):
             poly = []
             for d in range(D):
-                poly.append(F(rand.randint(0, Q-1)))
+                poly.append(F(randint(0, Q-1)))
             row.append(R(poly))
         rows.append(row)
     return matrix(rows)
 
-def rand_uniform_mat(N, M):
-    '''
-    Returns a random N by M matrix over R.
-    '''
     return uniform_mat_from_rand(Random(randbytes(32)), N, M)
 
 def rand_short_mat(N, M):
@@ -64,22 +59,6 @@ def rand_short_mat(N, M):
             row.append(R(poly))
         rows.append(row)
     return matrix(rows)
-
-def rand_bleep_mat(N, M):
-    '''
-    XXX
-    '''
-    rows = []
-    for i in range(N):
-        row = []
-        for j in range(M):
-            poly = []
-            for d in range(D):
-                poly.append(F(2*randint(0,1) - 1))
-            row.append(R(poly))
-        rows.append(row)
-    return matrix(rows)
-
 
 def gadget_inv(U):
     '''
@@ -146,21 +125,40 @@ def sample_trapdoor(T, A, R, u):
     x = p + R * gadget_inv(T.inverse() * (u - A*p))
     return x
 
+def attr_to_ext(N, i, attr):
+    '''
+    XXX
+    '''
+    F_ext = GF(Q**N)
+
+    # TODO We should salt this using a seed store in the public parameters.
+    #
+    # TODO Use a XOF here to ensure tag matrix derivation is collision
+    # resistant (e.g., SHAKE128). Also, Q^N needs to e large enough.
+    rand = Random(bytes(i) + attr)
+    h = F_ext([ rand.randint(0, Q-1) for _ in range(N) ])
+    return h
+
 def tag(N, i, attr):
     '''
     Derive an invertible tag matrix from the given index (i) and attribute.
     '''
+    F_ext = GF(Q**N)
+
     assert 0 <= i < 256  # i is encoded with a byte
     if attr == None:
         return zero_mat(N, N)
 
-    # TODO Use a XOF here to ensure tag matrix derivation is collision
-    # resistant (e.g., SHAKE128).
-    rand = Random(bytes(i) + attr)
-    H = uniform_mat_from_rand(rand, N, N)
-    while not H.is_invertible():
-        H = uniform_mat_from_rand(rand, N, N)
-    return H
+    h = attr_to_ext(N, i, attr)
+    x = F_ext([0, 1])
+    b = F_ext([1])
+    cols = []
+    for _ in range(N):
+        c = h*b
+        b *= x
+        col = [ R([y]) for y in c.list() ]
+        cols.append(col)
+    return matrix(cols).T
 
 def enc_attr_to_tags(N, attrs):
     '''
