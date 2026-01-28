@@ -5,7 +5,7 @@ from random import Random, randbytes, randint
 from sage.all import GF, Integer, PolynomialRing, ceil, log, matrix
 from sage.stats.distributions.discrete_gaussian_integer import DiscreteGaussianDistributionIntegerSampler
 
-Dist = DiscreteGaussianDistributionIntegerSampler(sigma=15)
+Dist = DiscreteGaussianDistributionIntegerSampler(sigma=14)
 Q = 8380417
 D = 256
 K = ceil(log(Q) / log(2))
@@ -28,21 +28,26 @@ def identity_mat(N):
         out[i,i] = R(1)
     return matrix(out)
 
-def rand_uniform_mat(N, M):
+def uniform_mat_from_rand(rand, N, M):
     '''
-    Returns a random N by M matrix over R.
+    Returns a random N by M matrix over R using the provided source of
+    randomness.
     '''
     rows = []
-    for n in range(N):
+    for i in range(N):
         row = []
-        for m in range(M):
+        for j in range(M):
             poly = []
             for d in range(D):
-                poly.append(F(randint(0, Q-1)))
+                poly.append(F(rand.randint(0, Q-1)))
             row.append(R(poly))
         rows.append(row)
     return matrix(rows)
 
+def rand_uniform_mat(N, M):
+    '''
+    Returns a random N by M matrix over R.
+    '''
     return uniform_mat_from_rand(Random(randbytes(32)), N, M)
 
 def rand_short_mat(N, M):
@@ -159,6 +164,20 @@ def tag(N, i, attr):
         col = [ R([y]) for y in c.list() ]
         cols.append(col)
     return matrix(cols).T
+
+def old_tag(N, i, attr):
+    '''
+    Don't use this, it makes encryption too noisy.
+    '''
+    assert 0 <= i < 256  # i is encoded with a byte
+    if attr == None:
+        return zero_mat(N, N)
+
+    rand = Random(bytes(i) + attr)
+    H = uniform_mat_from_rand(rand, N, N)
+    while not H.is_invertible():
+        H = uniform_mat_from_rand(rand, N, N)
+    return H
 
 def enc_attr_to_tags(N, attrs):
     '''
